@@ -1,98 +1,90 @@
-const PORT = process.env.PORT || 4100
-const express = require('express')
-const bodyParser = require("body-parser")
-const cors = require('cors')
-require('./config/db'); 
-const app = express()
-const http = require('http');
-const socketio = require('socket.io');
+const PORT = process.env.PORT || 4100;
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+require("./config/db");
+const app = express();
+const http = require("http");
+const socketio = require("socket.io");
 
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
 
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
-app.use(cors())
-
-const { addUser, removeUser, getUser, getUsersInRoom } = require('./controller/chat-room');
-const router = require('./routes/chat-room');
-const auth = require('./routes/auth');
-app.use('/auth', auth)
+const {
+  addUser,
+  removeUser,
+  getUser,
+  getUsersInRoom,
+} = require("./controller/chat-room");
+const router = require("./routes/chat-room");
+const auth = require("./routes/auth");
+app.use("/auth", auth);
 
 app.listen(PORT, function () {
-    console.log('App started')
-})
+  console.log("App started");
+});
 app.get("/", (req, res) => {
-    res.json('welcome!!')
-})
+  res.json("welcome!!");
+});
 //chat-room
 const server = http.createServer(app);
 const io = socketio(server);
 
-io.on('connect', (socket) => {
-    socket.on('join', ({ name, room }, callback) => {
-      const { error, user } = addUser({ id: socket.id, name, room });
-  
-      if(error) return callback(error);
-  
-      socket.join(user.room);
-  
-      socket.emit('message', { user: 'admin', text: `${user.name}, welcome to room ${user.room}.`});
-      socket.broadcast.to(user.room).emit('message', { user: 'admin', text: `${user.name} has joined!` });
-  
-      io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
-  
-      callback();
+io.on("connect", (socket) => {
+  socket.on("join", ({ name, room }, callback) => {
+    const { error, user } = addUser({ id: socket.id, name, room });
+
+    if (error) return callback(error);
+
+    socket.join(user.room);
+
+    socket.emit("message", {
+      user: "admin",
+      text: `${user.name}, welcome to room ${user.room}.`,
     });
-  
-    socket.on('sendMessage', (message, callback) => {
-      const user = getUser(socket.id);
-  
-      io.to(user.room).emit('message', { user: user.name, text: message });
-  
-      callback();
+    socket.broadcast
+      .to(user.room)
+      .emit("message", { user: "admin", text: `${user.name} has joined!` });
+
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
     });
-  
-    socket.on('disconnect', () => {
-      const user = removeUser(socket.id);
-  
-      if(user) {
-        io.to(user.room).emit('message', { user: 'Admin', text: `${user.name} has left.` });
-        io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room)});
-      }
-    })
+
+    callback();
   });
-  server.listen(5000, () => 
-  console.log(`Server has started.`)
-  );
 
-  // video-meet
+  socket.on("sendMessage", (message, callback) => {
+    const user = getUser(socket.id);
 
-// var port = process.env.PORT || 3000;
+    io.to(user.room).emit("message", { user: user.name, text: message });
 
-// io.on('connection', socket => {
-//     socket.on('room_join_request', payload => {
-//         socket.join(payload.roomName, err => {
-//             if (!err) {
-//                 io.in(payload.roomName).clients((err, clients) => {
-//                     if (!err) {
-//                         io.in(payload.roomName).emit('room_users', clients)
-//                     }
-//                 });
-//             }
-//         })
-//     })
+    callback();
+  });
 
-//     socket.on('offer_signal', payload => {
-//         io.to(payload.calleeId).emit('offer', { signalData: payload.signalData, callerId: payload.callerId });
-//     });
+  socket.on("disconnect", () => {
+    const user = removeUser(socket.id);
 
-//     socket.on('answer_signal', payload => {
-//         io.to(payload.callerId).emit('answer', { signalData: payload.signalData, calleeId: socket.id });
-//     });
+    if (user) {
+      io.to(user.room).emit("message", {
+        user: "Admin",
+        text: `${user.name} has left.`,
+      });
+      io.to(user.room).emit("roomData", {
+        room: user.room,
+        users: getUsersInRoom(user.room),
+      });
+    }
+  });
+});
+server.listen(5000, () => console.log(`Server has started.`));
 
-//     socket.on('disconnect', () => {
-//         io.emit('room_left', { type: 'disconnected', socketId: socket.id })
-//     })
+// video-meet
+const socket = require("./lib/socket");
+app.use("/", express.static(`${__dirname}/../client/dist`));
+
+// server.listen(6000, () => {
+//   socket(server);
+//   console.log("Server is listening at port 6000");
 // });
-
-// http.listen(port, () => console.log('listening on *:' + port)); 
-
